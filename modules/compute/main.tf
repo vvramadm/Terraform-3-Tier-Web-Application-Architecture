@@ -1,35 +1,51 @@
 # LATEST AMI FROM PARAMETER STORE
 
-data "aws_ssm_parameter" "three-tier-ami" {
-  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+data "aws_ami" "devops" {
+
+    most_recent = true
+    owners = [222352935292] # aws account id
+    filter {
+      
+      name = "name"
+      values = ["test123"]
+    }
+    filter {
+      name = "root-device-type"
+      values = ["ebs"]
+    }
+
+    filter {
+      name = "virtualization-type"
+      values = ["hvm"]
+    }
 }
 
-# SSH KEY FOR BASTION HOST
+## SSH KEY FOR BASTION HOST
 
-resource "tls_private_key" "main" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
+#resource "tls_private_key" "main" {
+#  algorithm = "RSA"
+#  rsa_bits  = 4096
+#}
 
-resource "aws_key_pair" "generated_key" {
-  key_name   = var.ssh_key
-  public_key = tls_private_key.main.public_key_openssh
-}
+#resource "aws_key_pair" "generated_key" {
+#  key_name   = var.ssh_key
+#  public_key = tls_private_key.main.public_key_openssh
+#}
 
-resource "local_file" "ssh_key" {
-  content         = tls_private_key.main.private_key_pem
-  filename        = "${var.ssh_key}.pem"
-  file_permission = "0400"
-}
+#resource "local_file" "ssh_key" {
+#  content         = tls_private_key.main.private_key_pem
+#  filename        = "${var.ssh_key}.pem"
+#  file_permission = "0400"
+#}
 
 # LAUNCH TEMPLATES AND AUTOSCALING GROUPS FOR BASTION HOST
 
 resource "aws_launch_template" "three_tier_bastion" {
   name_prefix            = "three_tier_bastion"
   instance_type          = var.instance_type
-  image_id               = data.aws_ssm_parameter.three-tier-ami.value
+  image_id               = data.aws_ami.devops.id
   vpc_security_group_ids = [var.bastion_sg]
-  key_name               = var.key_name
+# key_name               = var.key_name
 
   tags = {
     Name = "three_tier_bastion"
@@ -55,10 +71,10 @@ resource "aws_autoscaling_group" "three_tier_bastion" {
 resource "aws_launch_template" "three_tier_app" {
   name_prefix            = "three_tier_app"
   instance_type          = var.instance_type
-  image_id               = data.aws_ssm_parameter.three-tier-ami.value
+  image_id               = data.aws_ami.devops.id
   vpc_security_group_ids = [var.frontend_app_sg]
   user_data              = filebase64("install_apache.sh")
-  key_name               = var.key_name
+  #key_name               = var.key_name
 
   tags = {
     Name = "three_tier_app"
@@ -90,7 +106,7 @@ resource "aws_autoscaling_group" "three_tier_app" {
 resource "aws_launch_template" "three_tier_backend" {
   name_prefix            = "three_tier_backend"
   instance_type          = var.instance_type
-  image_id               = data.aws_ssm_parameter.three-tier-ami.value
+  image_id               = data.aws_ami.devops.id
   vpc_security_group_ids = [var.backend_app_sg]
   key_name               = var.key_name
   user_data              = filebase64("install_node.sh")
